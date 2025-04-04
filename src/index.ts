@@ -1,25 +1,34 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { setupClaudeCodeServer } from "./server/claude-code-server.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import express from "express";
+const app = express();
 
-async function main() {
-  // Create an MCP server
-  const server = new McpServer({
-    name: "Claude Code MCP",
-    version: "1.0.0"
-  });
+const server = new McpServer({
+  name: "Claude Code MCP",
+  version: "1.0.0"
+});
 
-  // Set up Claude Code functionality
-  await setupClaudeCodeServer(server);
+// Set up Claude Code functionality
+await setupClaudeCodeServer(server);
 
-  // Start receiving messages on stdin and sending messages on stdout
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+let transport: SSEServerTransport;
 
-  console.error("Claude Code MCP server started");
-}
+app.get("/sse", (req, res) => {
+    console.log("Received connection");
+    transport = new SSEServerTransport("/messages", res);
+    server.connect(transport);
+});
 
-main().catch((error) => {
-  console.error("Error starting Claude Code MCP server:", error);
-  process.exit(1);
+app.post("/messages", (req, res) => {
+    console.log("Received message handle message");
+    if (transport) {
+        transport.handlePostMessage(req, res);
+    }
+});
+
+const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
